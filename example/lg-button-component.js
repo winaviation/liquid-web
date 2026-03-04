@@ -1,0 +1,1 @@
+lg-button-component.js
