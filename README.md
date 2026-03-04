@@ -455,7 +455,7 @@ Make sure you've imported the JS modules and created your elements, like so:
 <liquid-btn fallback-blur="5">Click me</liquid-btn>
 ```
 
-Add the `height`, `width`, `radius`, `bezel-width`, `font-size` (they are all optional btw) attributes. Set them to whatever looks good on your screen:
+Add the `height`, `width`, `radius`, `bezel-width` (and `font-size` if you are adjusting the button element) attributes (all those attr are optional btw). Set them to whatever looks good on your screen:
 
 ```html
 <!-- my viewport is 1912x956, i wanted a floating glass element
@@ -490,7 +490,7 @@ In this example:
 - `font-size` not specified, `<liquid-btn>`-only
 
 > [!CAUTION]
-> "they are all optional btw"
+> "all those attr are optional btw"
 >
 > The attributes are indeed optional (to add), but if you don't use one of them, you will need to use their default values in the following steps. Default values are noted in the [Attributes explained](#attributes-explained) section above.
 
