@@ -318,18 +318,18 @@ force fallback mode even if the browser is chromium based. default: `"false"`
 
 overlay color on the glass surface. default: none (transparent)
 
-accepts any valid CSS color value — hex, rgb, rgba, hsl, hsla, named colors, etc.
+accepts any valid CSS color value: hex, rgb, rgba, hsl, hsla, named colors, etc.
 
 useful for giving a card a subtle color identity without changing the blur/refraction behind it. keep alpha low (0.05–0.15) or it will overpower the glass effect
 
 **examples:**
 
-- `tint="rgba(0, 255, 128, 0.08)"` — subtle mint tint
-- `tint="#00ff8015"` — same in 8-digit hex
-- `tint="hsl(150 100% 50% / 0.06)"` — same in hsl
-- `tint="rgba(255, 0, 0, 0.1)"` — red tint
+- `tint="rgba(0, 255, 128, 0.08)"`: subtle mint tint
+- `tint="#00ff8015"`: same in 8-digit hex
+- `tint="hsl(150 100% 50% / 0.06)"`: same in hsl
+- `tint="rgba(255, 0, 0, 0.1)"`: red tint
 
-**note:** tint is reactive — updating the attribute changes the color immediately without reinitializing the component
+**note:** tint is reactive, updating the attribute changes the color immediately without reinitializing the component
 
 </details>
 
