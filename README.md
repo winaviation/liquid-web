@@ -4,9 +4,15 @@ First off, I want to give credits to [@kube](https://github.com/kube) for the or
 
 I made this project with the goal of making [@kube](https://github.com/kube)'s Liquid Glass demonstration actually distributable and usable. Keep in mind that this isn't perfect, so funny stuff or whatnot could happen. PRs are welcome though!
 
+**[My personal website](https://winaviation.github.io)** is a pretty big usage example of this project.
+
 # Usage
 
 > [!CAUTION]
+> The guide below AND the components are largely incomplete especially mobile layout stuff, need an extra JS to make it work good, visit [my website's source](https://github.com/winaviation/winaviation.github.io) to see how I implemented it.
+> Though, the guide should be able to let you know the basics on the usage.
+
+> [!WARNING]
 > On non-Chromium browsers, a fallback blur will be used instead. As of now, the only browser engine that supports using SVG displacement maps in `backdrop-filter` is Blink (Chromium browsers).
 >
 > Although there is a hacky workaround to this by using `filter`, it is heavy on the GPU and adds complexity. I tried to do so in [liquid-glass-demo](https://github.com/winaviation/liquid-glass-demo) but I won't implement it here for now.
@@ -164,7 +170,7 @@ I made this project with the goal of making [@kube](https://github.com/kube)'s L
 
 #### Attributes explained:
 
-> All attributes are identical to `<liquid-glass>` except: `flex-center` does not exist on the button (content is always centered), and `font-size`/`font-size-percent` are button-only (`<liquid-btn>`). See the attribute docs below, they apply to both components unless noted.
+> All attributes are identical to `<liquid-glass>` except: `flex-center` does not exist on the button (content is always centered), and `font-size`/`font-size-percent`/`spring-timing` are button-only (`<liquid-btn>`). See the attribute docs below, they apply to both components unless noted.
 
 > **Universal/Fixed mode**
 
@@ -308,6 +314,26 @@ force fallback mode even if the browser is chromium based. default: `"false"`
 </details>
 
 <details>
+<summary><code>tint</code></summary>
+
+overlay color on the glass surface. default: none (transparent)
+
+accepts any valid CSS color value — hex, rgb, rgba, hsl, hsla, named colors, etc.
+
+useful for giving a card a subtle color identity without changing the blur/refraction behind it. keep alpha low (0.05–0.15) or it will overpower the glass effect
+
+**examples:**
+
+- `tint="rgba(0, 255, 128, 0.08)"` — subtle mint tint
+- `tint="#00ff8015"` — same in 8-digit hex
+- `tint="hsl(150 100% 50% / 0.06)"` — same in hsl
+- `tint="rgba(255, 0, 0, 0.1)"` — red tint
+
+**note:** tint is reactive — updating the attribute changes the color immediately without reinitializing the component
+
+</details>
+
+<details>
 <summary><code>flex-center</code> (<code>&lt;liquid-glass&gt;</code> only)</summary>
 
 content alignment mode. default: `"true"`
@@ -327,6 +353,18 @@ font size in pixels. default: `1.8rem` (≈ 29px at default browser font size)
 **note:** use `font-size-percent` instead when `responsive="true"`
 
 **example:** `<liquid-btn font-size="14">click</liquid-btn>`
+
+</details>
+
+<details>
+<summary><code>spring-timing</code> (<code>&lt;liquid-btn&gt;</code> only)</summary>
+
+controls how spring animations advance each frame. default: `"realtime"`
+
+- `"realtime"`: uses actual elapsed time between frames, animation completes in the correct wallclock duration but may stutter when frames drop (like when heavy GPU load)
+- `"fixed"`: uses a fixed `1/60s` timestep (u can edit it manually, search for `1 / 60` in `lg-button-component.js`), always smooth but plays in slow motion when frames drop
+
+**example:** `<liquid-btn spring-timing="fixed">click</liquid-btn>`
 
 </details>
 
@@ -412,9 +450,12 @@ font size as percentage of smallest dimension. for use with `responsive="true"`
 - **note:** smallest dimension = min(width, height)
 </details>
 
-## Calculating responsive attributes' values
+## Converting fixed values to responsive percentages
 
-This section guides how to convert fixed pixel values to responsive percentages so your Liquid Glass element scales perfectly across all screen sizes. The same steps apply to both `<liquid-glass>` and `<liquid-btn>`.
+> [!NOTE]
+> Skip this step unless you wanna be precise. You can just use arbitrary responsive values.
+
+This section guides how to convert fixed pixel values to responsive percentages. The same steps apply to both `<liquid-glass>` and `<liquid-btn>`.
 
 ### Step 1: Find your viewport size
 
@@ -646,10 +687,7 @@ Without this, fallback blur will not work. This is because the `backdrop-filter`
 
 ### Additional customization
 
-I don't have the time to add HTML attributes for every customization I could ever think of. But of course you can change the values directly in the JS components, with a bit of finding. Some things worth knowing where to look:
-
-- **`lg-component.js`:** hover/active scale, font size, etc.
-- **`lg-button-component.js`:** spring stiffness/damping, hover/press scale targets, shadow values, specular angle targets per state (idle → hover → press).
+I don't have the time to add HTML attributes for every customization I could ever think of. But of course you can change the values directly in the JS components, with a bit of finding using the comments.
 
 # License
 

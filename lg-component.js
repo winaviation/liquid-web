@@ -1,5 +1,5 @@
-// static glass element template
-// this the html/css that gets cloned into each element's shadow dom
+// shadow dom template for the static glass element
+// unlike the button variant, this one has no spring animations, its purely visual
 const glassTemplate = document.createElement("template");
 glassTemplate.innerHTML = `
   <style>
@@ -22,8 +22,10 @@ glassTemplate.innerHTML = `
               top: 0;
               left: 0;
               z-index: 3;
-              pointer-events: none; /* clicks pass through */
+              pointer-events: none;
+              background-color: var(--glass-tint, transparent);
           }
+          /* sits above glass-inner so slotted content is always on top */
           .content-slot {
               display: var(--slot-display, flex);
               justify-content: var(--slot-justify, center);
@@ -38,14 +40,16 @@ glassTemplate.innerHTML = `
             width: 0;
             height: 0;
             overflow: hidden;
-            pointer-events: none; /* svg is invisible, just holds filter defs */
+            pointer-events: none;
         }
-        /* chromium: use svg displacement for refraction */
+
+        /* chromium only, svg backdrop-filter for full liquid glass effect */
         .use-backdrop-filter .glass-inner {
             backdrop-filter: url(#liquidGlassFilter);
             -webkit-backdrop-filter: url(#liquidGlassFilter);
         }
-        /* non-chromium: fallback to simple blur */
+
+        /* non-chromium fallback, plain blur with a subtle inset border */
         .fallback-blur .glass-inner {
             backdrop-filter: blur(var(--fallback-blur, 15px)) saturate(1.2);
             -webkit-backdrop-filter: blur(var(--fallback-blur, 15px)) saturate(1.2);
@@ -57,10 +61,10 @@ glassTemplate.innerHTML = `
         }
     </style>
     <div class="glass-element" id="glassElement">
+        <!-- invisible svg, its filter is referenced by backdrop-filter url() on .glass-inner -->
         <svg class="glass-filter-svg" id="glassFilterSvg">
             <defs>
                 <filter id="liquidGlassFilter" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
-                    <!-- same svg filter structure as button -->
                     <feGaussianBlur id="filterBlur" in="SourceGraphic" stdDeviation="0.5" result="blurred"/>
                     <feImage id="displacementImage" href="" x="0" y="0" width="200" height="80" result="displacement_map" preserveAspectRatio="none"/>
                     <feDisplacementMap id="displacementMap" in="blurred" in2="displacement_map" scale="50" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
@@ -80,7 +84,7 @@ glassTemplate.innerHTML = `
     </div>
 `;
 
-// same surface equations as button component
+// math profiles for the glass edge shape, each fn maps x in [0,1] to a surface height
 const SurfaceEquations = {
   convex_circle: (x) => Math.sqrt(1 - Math.pow(1 - x, 2)),
   convex_squircle: (x) => Math.pow(1 - Math.pow(1 - x, 4), 1 / 4),
@@ -94,7 +98,6 @@ const SurfaceEquations = {
   },
 };
 
-// debounce helper for resize events
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -107,28 +110,22 @@ function debounce(func, wait) {
   };
 }
 
-// main static liquid glass element
-// same math as button but no animations/springs
-// main static liquid glass element
-// same math as button but no animations/springs
+// static glass container, same refraction pipeline as liquid-btn but without any spring animations
 class LiquidGlass extends HTMLElement {
   constructor() {
     super();
 
-    // create shadow dom
     this.attachShadow({ mode: "open" });
     this.shadowRoot.appendChild(glassTemplate.content.cloneNode(true));
 
-    // grab element references
     this.glassElement = this.shadowRoot.getElementById("glassElement");
     this.glassInner = this.shadowRoot.getElementById("glassInner");
     this.glassFilterSvg = this.shadowRoot.getElementById("glassFilterSvg");
 
-    // config storage
     this.CONFIG = {};
 
-    // responsive mode: recalculate on window resize
     this.boundResizeHandler = null;
+    // debounced so we dont nuke performance on every resize tick
     this.debouncedResize = debounce(() => {
       if (this.CONFIG.isInitialized) {
         this.init();
@@ -136,25 +133,22 @@ class LiquidGlass extends HTMLElement {
     }, 150);
   }
 
-  // called when element added to page
   connectedCallback() {
     this.init();
 
-    // set up resize listener for responsive mode
+    // only attach resize listener when responsive mode is explicitly enabled
     if (this.getAttribute("responsive") === "true") {
       this.boundResizeHandler = this.debouncedResize.bind(this);
       window.addEventListener("resize", this.boundResizeHandler);
     }
   }
 
-  // cleanup when element removed
   disconnectedCallback() {
     if (this.getAttribute("responsive") === "true" && this.boundResizeHandler) {
       window.removeEventListener("resize", this.boundResizeHandler);
     }
   }
 
-  // attributes to watch for changes
   static get observedAttributes() {
     return [
       "type",
@@ -175,19 +169,29 @@ class LiquidGlass extends HTMLElement {
       "vw-width",
       "vh-height",
       "force-fallback",
+      "font-size",
+      "font-size-percent",
+      "tint",
     ];
   }
+
   attributeChangedCallback(name, oldValue, newValue) {
+    // bail if nothing changed or component hasnt mounted yet
     if (oldValue === newValue || !this.CONFIG.isInitialized) {
       return;
     }
+    // any attr change triggers a full reinit, simpler than partial updates since its not animated
     this.init();
   }
+
+  // resolves dimensions + config from attrs, then runs the glass rendering pipeline
   init() {
     const type = this.getAttribute("type") || "squircle";
     const isResponsive = this.getAttribute("responsive") === "true";
     let width, height, radius;
     const attrRadius = parseFloat(this.getAttribute("radius"));
+
+    // responsive mode derives dimensions from viewport, falls back to type-based defaults
     if (isResponsive) {
       const vwWidth = parseFloat(this.getAttribute("vw-width"));
       const vhHeight = parseFloat(this.getAttribute("vh-height"));
@@ -208,6 +212,7 @@ class LiquidGlass extends HTMLElement {
             break;
         }
       } else {
+        // no explicit vw/vh set, use large default fills per type
         switch (type) {
           case "pill":
             width = Math.round(window.innerWidth * 0.97);
@@ -245,6 +250,7 @@ class LiquidGlass extends HTMLElement {
         }
       }
     } else {
+      // fixed mode, read px values from attrs with sensible defaults per type
       switch (type) {
         case "pill":
           width = parseFloat(this.getAttribute("width")) || 200;
@@ -273,6 +279,8 @@ class LiquidGlass extends HTMLElement {
     this.glassElement.style.width = `${width}px`;
     this.glassElement.style.height = `${height}px`;
     this.glassElement.style.borderRadius = `${radius}px`;
+
+    // flex-center="false" lets slotted content flow naturally instead of being centered
     const flexCenter = this.getAttribute("flex-center");
     if (flexCenter === "false") {
       this.glassElement.style.setProperty("--slot-display", "block");
@@ -283,11 +291,15 @@ class LiquidGlass extends HTMLElement {
       this.glassElement.style.setProperty("--slot-justify", "center");
       this.glassElement.style.setProperty("--slot-align", "center");
     }
+
+    // sync feImage dimensions so displacement map covers the whole element
     const feImages = this.shadowRoot.querySelectorAll("feImage");
     feImages.forEach((img) => {
       img.setAttribute("width", width.toString());
       img.setAttribute("height", height.toString());
     });
+
+    // bezel is the rim region where the refraction effect actually shows
     let bezelWidth;
     const bezelWidthPercent = parseFloat(
       this.getAttribute("bezel-width-percent"),
@@ -304,6 +316,7 @@ class LiquidGlass extends HTMLElement {
         ? Math.round(Math.min(width, height) * 0.038)
         : 20;
     }
+
     this.CONFIG = {
       type: type,
       surfaceType: this.getAttribute("surface-type") || "convex_squircle",
@@ -324,11 +337,28 @@ class LiquidGlass extends HTMLElement {
       "--fallback-blur",
       `${this.CONFIG.fallbackBlurRadius}px`,
     );
+
+    const fontSizePercent = parseFloat(this.getAttribute("font-size-percent"));
+    const fontSizeAttr = parseFloat(this.getAttribute("font-size"));
+    if (isResponsive && !isNaN(fontSizePercent)) {
+      this.style.fontSize = `${Math.round(Math.min(width, height) * (fontSizePercent / 100))}px`;
+    } else if (!isNaN(fontSizeAttr)) {
+      this.style.fontSize = `${fontSizeAttr}px`;
+    } else {
+      this.style.fontSize = "";
+    }
+
+    const tint = this.getAttribute("tint");
+    this.glassElement.style.setProperty("--glass-tint", tint || "transparent");
+
     this.detectBackdropFilterSupport();
     if (!this.glassElement.classList.contains("fallback-blur")) {
       this.updateFilter();
     }
   }
+
+  // checks if the browser supports svg backdrop-filter (chromium only)
+  // falls back to simple blur on everything else
   detectBackdropFilterSupport() {
     if (this.getAttribute("force-fallback") === "true") {
       this.glassElement.classList.add("fallback-blur");
@@ -347,8 +377,12 @@ class LiquidGlass extends HTMLElement {
       if (this.glassFilterSvg) this.glassFilterSvg.remove();
     }
   }
+
+  // runs the full refraction pipeline and pushes maps into the svg filter
   updateFilter() {
     const surfaceFn = SurfaceEquations[this.CONFIG.surfaceType];
+
+    // compute 1d refraction profile along the bezel cross-section
     const precomputed = this.calculateDisplacementMap1D(
       this.CONFIG.glassThickness,
       this.CONFIG.bezelWidth,
@@ -356,6 +390,8 @@ class LiquidGlass extends HTMLElement {
       this.CONFIG.refractiveIndex,
     );
     this.CONFIG.maximumDisplacement = Math.max(...precomputed.map(Math.abs));
+
+    // expand 1d profile into full 2d imagedata for feDisplacementMap
     const displacementData = this.calculateDisplacementMap2D(
       this.CONFIG.objectWidth,
       this.CONFIG.objectHeight,
@@ -366,6 +402,8 @@ class LiquidGlass extends HTMLElement {
       this.CONFIG.maximumDisplacement || 1,
       precomputed,
     );
+
+    // generate the rim specular highlight
     const specularData = this.calculateSpecularHighlight(
       this.CONFIG.objectWidth,
       this.CONFIG.objectHeight,
@@ -374,6 +412,8 @@ class LiquidGlass extends HTMLElement {
     );
     const displacementUrl = this.imageDataToDataURL(displacementData);
     const specularUrl = this.imageDataToDataURL(specularData);
+
+    // push both maps into the svg filter as data urls
     this.shadowRoot
       .getElementById("displacementImage")
       .setAttribute("href", displacementUrl);
@@ -394,10 +434,8 @@ class LiquidGlass extends HTMLElement {
       .setAttribute("stdDeviation", this.CONFIG.blur);
   }
 
-  // these below are identical to the button component's versions
-  // see lg-button-component.js for detailed comments on the math
-
-  // calculate 1d refraction curve using snell's law
+  // snells law refraction along a 1d cross-section of the glass surface
+  // returns lateral displacement values for each sample along the bezel
   calculateDisplacementMap1D(
     glassThickness,
     bezelWidth,
@@ -406,6 +444,8 @@ class LiquidGlass extends HTMLElement {
     samples = 128,
   ) {
     const eta = 1 / refractiveIndex;
+
+    // refract a ray through the surface normal, returns null on total internal reflection
     function refract(normalX, normalY) {
       const dot = normalY;
       const k = 1 - eta * eta * (1 - dot * dot);
@@ -420,6 +460,8 @@ class LiquidGlass extends HTMLElement {
     for (let i = 0; i < samples; i++) {
       const x = i / samples;
       const y = surfaceFn(x);
+
+      // numerically estimate the surface normal from the slope at this point
       const dx = x < 1 ? 0.0001 : -0.0001;
       const y2 = surfaceFn(Math.max(0, Math.min(1, x + dx)));
       const derivative = (y2 - y) / dx;
@@ -429,6 +471,7 @@ class LiquidGlass extends HTMLElement {
       if (!refracted) {
         result.push(0);
       } else {
+        // project refracted ray through remaining glass height to get final lateral offset
         const remainingHeightOnBezel = y * bezelWidth;
         const remainingHeight = remainingHeightOnBezel + glassThickness;
         result.push(refracted[0] * (remainingHeight / refracted[1]));
@@ -437,8 +480,9 @@ class LiquidGlass extends HTMLElement {
     return result;
   }
 
-  // apply 1d curve to 2d shape
-  // creates the actual displacement map
+  // maps the 1d refraction profile onto 2d imagedata
+  // rg channels = x/y displacement, 128 = neutral (no displacement)
+  // handles rounded rect corners and straight edges uniformly
   calculateDisplacementMap2D(
     canvasWidth,
     canvasHeight,
@@ -449,6 +493,7 @@ class LiquidGlass extends HTMLElement {
     maximumDisplacement,
     precomputedMap,
   ) {
+    // init to neutral gray, pixels outside the bezel stay untouched
     const imageData = new ImageData(canvasWidth, canvasHeight);
     for (let i = 0; i < imageData.data.length; i += 4) {
       imageData.data[i] = 128;
@@ -469,6 +514,8 @@ class LiquidGlass extends HTMLElement {
     for (let y1 = 0; y1 < objectHeight; y1++) {
       for (let x1 = 0; x1 < objectWidth; x1++) {
         const idx = ((objectY + y1) * canvasWidth + objectX + x1) * 4;
+
+        // remap each pixel relative to the nearest corner, straight edges collapse to 0
         const isOnLeftSide = x1 < radius;
         const isOnRightSide = x1 >= objectWidth - radius;
         const isOnTopSide = y1 < radius;
@@ -488,6 +535,7 @@ class LiquidGlass extends HTMLElement {
           distanceToCenterSquared <= radiusPlusOneSquared &&
           distanceToCenterSquared >= radiusMinusBezelSquared;
         if (isInBezel) {
+          // feather at the outer edge for antialiasing
           const opacity =
             distanceToCenterSquared < radiusSquared
               ? 1
@@ -497,8 +545,12 @@ class LiquidGlass extends HTMLElement {
                   (Math.sqrt(radiusPlusOneSquared) - Math.sqrt(radiusSquared));
           const distanceFromCenter = Math.sqrt(distanceToCenterSquared);
           const distanceFromSide = radius - distanceFromCenter;
+
+          // unit vector from corner center outward, this is the displacement direction
           const cos = distanceFromCenter > 0 ? x / distanceFromCenter : 0;
           const sin = distanceFromCenter > 0 ? y / distanceFromCenter : 0;
+
+          // look up displacement magnitude from the precomputed 1d profile
           const bezelRatio = Math.max(
             0,
             Math.min(1, distanceFromSide / bezelWidth),
@@ -508,6 +560,8 @@ class LiquidGlass extends HTMLElement {
             precomputedMap[
               Math.max(0, Math.min(bezelIndex, precomputedMap.length - 1))
             ] || 0;
+
+          // normalize to [-1, 1] then encode into [0, 255] for the svg filter
           const dX =
             maximumDisplacement > 0
               ? (-cos * distance) / maximumDisplacement
@@ -532,8 +586,7 @@ class LiquidGlass extends HTMLElement {
     return imageData;
   }
 
-  // calculate bright rim highlight
-  // simulates light reflecting off glass edge
+  // generates the rim specular highlight, white glow on the edge aligned with the light direction
   calculateSpecularHighlight(
     objectWidth,
     objectHeight,
@@ -570,6 +623,8 @@ class LiquidGlass extends HTMLElement {
             ? y1 - radius - heightBetweenRadiuses
             : 0;
         const distanceToCenterSquared = x * x + y * y;
+
+        // only paint within the thin specular band at the very edge
         const isNearEdge =
           distanceToCenterSquared <= radiusPlusOneSquared &&
           distanceToCenterSquared >= radiusMinusSpecularSquared;
@@ -584,6 +639,8 @@ class LiquidGlass extends HTMLElement {
                   (Math.sqrt(radiusPlusOneSquared) - Math.sqrt(radiusSquared));
           const cos = distanceFromCenter > 0 ? x / distanceFromCenter : 0;
           const sin = distanceFromCenter > 0 ? -y / distanceFromCenter : 0;
+
+          // how aligned is this edge segment with the light source direction
           const dotProduct = Math.abs(
             cos * specularVector[0] + sin * specularVector[1],
           );
@@ -591,9 +648,13 @@ class LiquidGlass extends HTMLElement {
             0,
             Math.min(1, distanceFromSide / specularThickness),
           );
+
+          // sharp falloff keeps the highlight tight to the rim
           const sharpFalloff = Math.sqrt(1 - (1 - edgeRatio) * (1 - edgeRatio));
           const coefficient = dotProduct * sharpFalloff;
           const color = Math.min(255, 255 * coefficient);
+
+          // squaring the alpha makes the highlight punchier and more physically plausible
           const finalOpacity = Math.min(255, color * coefficient * opacity);
           imageData.data[idx] = color;
           imageData.data[idx + 1] = color;
@@ -605,7 +666,7 @@ class LiquidGlass extends HTMLElement {
     return imageData;
   }
 
-  // convert imagedata to base64 url for svg <feImage>
+  // bakes imagedata into a base64 data url via an offscreen canvas
   imageDataToDataURL(imageData) {
     const canvas = document.createElement("canvas");
     canvas.width = imageData.width;
@@ -616,5 +677,4 @@ class LiquidGlass extends HTMLElement {
   }
 }
 
-// register the custom element
 customElements.define("liquid-glass", LiquidGlass);
