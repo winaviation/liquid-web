@@ -10,6 +10,7 @@ I made this project with the goal of making [@kube](https://github.com/kube)'s L
 
 > [!CAUTION]
 > The guide below AND the components are largely incomplete especially mobile layout stuff, need an extra JS to make it work good, visit [my website's source](https://github.com/winaviation/winaviation.github.io) to see how I implemented it.
+>
 > Though, the guide should be able to let you know the basics on the usage.
 
 > [!WARNING]
