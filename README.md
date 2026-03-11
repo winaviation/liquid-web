@@ -1,5 +1,7 @@
 # Liquid (Gl)ass in HTML/CSS/JS
 
+<img align="center" src="img/cover.png">
+
 First off, I want to give credits to [@kube](https://github.com/kube) for the original [React TS implementation](https://github.com/kube/kube.io/tree/main/app/data/articles/2025_10_04_liquid_glass_css_svg) of his [Liquid Glass article](https://kube.io/blog/liquid-glass-css-svg). Without it, this wouldn't have existed!
 
 I made this project with the goal of making [@kube](https://github.com/kube)'s Liquid Glass demonstration actually distributable and usable. Keep in mind that this isn't perfect, so funny stuff or whatnot could happen. PRs are welcome though!
